@@ -10,4 +10,8 @@ Bellow I have presented images of the game itself, and the code used to make the
  - Python 
 
 <h2> Game Itself </h2>
+The full game script is linked in this repository. 
+<h3> To Install and Run</h3>
+Install - pip install pygame 
+Run - python Main.py 
 
