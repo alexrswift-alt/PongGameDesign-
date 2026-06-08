@@ -1,6 +1,6 @@
 import pygame, math, random, sys
  
-# ── Constants ──────────────────────────────────────────────────────────────────
+#  Constants
 WIDTH, HEIGHT = 800, 800
 FPS = 60
 CENTER = (WIDTH // 2, HEIGHT // 2)
@@ -15,7 +15,7 @@ BALL_RADIUS    = 10
 BALL_SPEED     = 3.2
  
 
-# Black and white colors
+# colors
 BG_DARK      = (0, 0, 0)
 ARENA_COL    = (0, 128, 128)
 BALL_COL     = (0, 128, 128)
@@ -26,7 +26,7 @@ GLOW_COL     = (0, 128, 128, 60)
 HIT_FLASH    = 8            # frames to flash paddle on hit
  
  
-# ── Helper ─────────────────────────────────────────────────────────────────────
+# Helper
 def angle_to_vec(deg):
     r = math.radians(deg)
     return math.cos(r), math.sin(r)
@@ -64,7 +64,7 @@ def point_on_arc(cx, cy, radius, mid_angle_deg, arc_deg):
     return pts
  
  
-# ── Game State ─────────────────────────────────────────────────────────────────
+#  Game State
 class Ball:
     def __init__(self):
         self.reset()
@@ -97,7 +97,7 @@ class Ball:
         dist = math.hypot(dx, dy)
         if dist == 0:
             return
-        nx, ny = dx / dist, dy / dist          # outward normal
+        nx, ny = dx / dist, dy / dist          
         dot = self.vx * nx + self.vy * ny
         self.vx -= 2 * dot * nx
         self.vy -= 2 * dot * ny
@@ -194,7 +194,7 @@ class Paddle:
                         self.angle, PADDLE_ARC_DEG, PADDLE_THICK, glow=glow)
  
  
-# ── Main ───────────────────────────────────────────────────────────────────────
+#  Main 
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -240,7 +240,7 @@ def main():
     while running:
         dt = clock.tick(FPS)
 
-        # ── Events ──
+        #  Events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -268,7 +268,7 @@ def main():
 
         keys = pygame.key.get_pressed()
 
-        # ── Update ──
+       # additions 
         if state == "playing":
             # Restrict p1 to bottom half, p2 to top half
             p1.update(keys, restrict_half='bottom')
@@ -350,7 +350,7 @@ def main():
             if mode == 1:
                 player_hits = 0
 
-        # ── Draw ──
+        # Draw
         screen.fill(BG_DARK)
         screen.blit(arena_surf, (0, 0))
 
