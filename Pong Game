@@ -1,0 +1,427 @@
+import pygame, math, random, sys
+ 
+# ── Constants ──────────────────────────────────────────────────────────────────
+WIDTH, HEIGHT = 800, 800
+FPS = 60
+CENTER = (WIDTH // 2, HEIGHT // 2)
+CX, CY = CENTER
+ 
+ARENA_RADIUS   = 320      # inner wall radius
+PADDLE_ORBIT   = 310      # how far the paddle centre sits from screen centre
+PADDLE_ARC_DEG = 28       # angular width of each paddle in degrees
+PADDLE_THICK   = 10       # pixel thickness of paddle arc
+ 
+BALL_RADIUS    = 10
+BALL_SPEED     = 3.2
+ 
+
+# Black and white colors
+BG_DARK      = (0, 0, 0)
+ARENA_COL    = (0, 128, 128)
+BALL_COL     = (0, 128, 128)
+P1_COL       = (255, 255, 255)
+P2_COL       = (255, 255, 255)
+TEXT_COL     = (255, 255, 255)
+GLOW_COL     = (0, 128, 128, 60)
+HIT_FLASH    = 8            # frames to flash paddle on hit
+ 
+ 
+# ── Helper ─────────────────────────────────────────────────────────────────────
+def angle_to_vec(deg):
+    r = math.radians(deg)
+    return math.cos(r), math.sin(r)
+ 
+def draw_arc_paddle(surface, colour, cx, cy, radius, mid_angle_deg, arc_deg, thickness, glow=False):
+    """Draw a thick arc paddle using multiple offset lines."""
+    
+    
+    
+    layers = [(colour, thickness)]
+    if glow:
+        glow_c = (*colour[:3], 80)
+        layers = [(glow_c, thickness + 8), (colour, thickness)]
+ 
+    start_deg = mid_angle_deg - arc_deg / 2
+    end_deg   = mid_angle_deg + arc_deg / 2
+    steps     = 60
+ 
+    for col, thick in layers:
+        pts = []
+        for i in range(steps + 1):
+            a = math.radians(start_deg + (end_deg - start_deg) * i / steps)
+            pts.append((cx + radius * math.cos(a), cy + radius * math.sin(a)))
+        if len(pts) > 1:
+            pygame.draw.lines(surface, col, False, pts, thick)
+ 
+def point_on_arc(cx, cy, radius, mid_angle_deg, arc_deg):
+    """Return list of points along the arc (for hit testing)."""
+    start = mid_angle_deg - arc_deg / 2
+    end   = mid_angle_deg + arc_deg / 2
+    pts = []
+    for i in range(40):
+        a = math.radians(start + (end - start) * i / 39)
+        pts.append((cx + radius * math.cos(a), cy + radius * math.sin(a)))
+    return pts
+ 
+ 
+# ── Game State ─────────────────────────────────────────────────────────────────
+class Ball:
+    def __init__(self):
+        self.reset()
+ 
+    def reset(self):
+        ang = math.radians(random.uniform(0, 360))
+        self.x = float(CX)
+        self.y = float(CY)
+        self.vx = BALL_SPEED * math.cos(ang)
+        self.vy = BALL_SPEED * math.sin(ang)
+        self.trail = []
+ 
+    def update(self):
+        self.trail.append((self.x, self.y))
+        if len(self.trail) > 18:
+            self.trail.pop(0)
+        self.x += self.vx
+        self.y += self.vy
+ 
+    def dist_from_center(self):
+        return math.hypot(self.x - CX, self.y - CY)
+ 
+    def angle_from_center(self):
+        return math.degrees(math.atan2(self.y - CY, self.x - CX))
+ 
+    def reflect_off_wall(self):
+        """Bounce ball off the circular arena wall."""
+        dx = self.x - CX
+        dy = self.y - CY
+        dist = math.hypot(dx, dy)
+        if dist == 0:
+            return
+        nx, ny = dx / dist, dy / dist          # outward normal
+        dot = self.vx * nx + self.vy * ny
+        self.vx -= 2 * dot * nx
+        self.vy -= 2 * dot * ny
+        # push ball back inside
+        overlap = dist - (ARENA_RADIUS - BALL_RADIUS)
+        self.x -= nx * overlap
+        self.y -= ny * overlap
+ 
+    def draw(self, surf):
+        # trail
+        for i, (tx, ty) in enumerate(self.trail):
+            alpha = int(180 * i / len(self.trail))
+            r = max(2, int(BALL_RADIUS * i / len(self.trail)))
+            s = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
+            pygame.draw.circle(s, (*BALL_COL, alpha), (r, r), r)
+            surf.blit(s, (int(tx)-r, int(ty)-r))
+        # ball
+        pygame.draw.circle(surf, BALL_COL, (int(self.x), int(self.y)), BALL_RADIUS)
+        # glow
+        gs = pygame.Surface((BALL_RADIUS*6, BALL_RADIUS*6), pygame.SRCALPHA)
+        pygame.draw.circle(gs, (*BALL_COL, 50), (BALL_RADIUS*3, BALL_RADIUS*3), BALL_RADIUS*3)
+        surf.blit(gs, (int(self.x)-BALL_RADIUS*3, int(self.y)-BALL_RADIUS*3))
+ 
+ 
+class Paddle:
+    def __init__(self, angle, colour, keys_left, keys_right):
+        self.angle   = float(angle)   # degrees; 0 = right, 90 = down
+        self.colour  = colour
+        self.key_l   = keys_left
+        self.key_r   = keys_right
+        self.speed   = 2.2            # degrees per frame
+        self.flash   = 0
+ 
+    def update(self, keys, restrict_half=None):
+        if keys[self.key_l]:
+            self.angle -= self.speed
+        if keys[self.key_r]:
+            self.angle += self.speed
+        self.angle %= 360
+        # Restrict paddle to its half if specified
+        if restrict_half == 'bottom':
+            # 180° to 360° (or -180° to 0°)
+            if self.angle < 180:
+                self.angle = 180
+            if self.angle > 360:
+                self.angle = 360
+        elif restrict_half == 'top':
+            # 0° to 180°
+            if self.angle > 180 and self.angle < 360:
+                self.angle = 180
+        if self.flash > 0:
+            self.flash -= 1
+ 
+    def hit_test(self, ball):
+        """True if ball is close enough to the paddle arc to bounce."""
+        dist = ball.dist_from_center()
+        if abs(dist - PADDLE_ORBIT) > BALL_RADIUS + PADDLE_THICK // 2 + 2:
+            return False
+        ball_ang = ball.angle_from_center() % 360
+        pad_ang  = self.angle % 360
+        diff = abs(ball_ang - pad_ang)
+        if diff > 180:
+            diff = 360 - diff
+        return diff <= PADDLE_ARC_DEG / 2 + 1
+ 
+    def bounce_ball(self, ball):
+        """Reflect ball radially (away from center) with random angle change and increase speed."""
+        dx = ball.x - CX
+        dy = ball.y - CY
+        dist = math.hypot(dx, dy)
+        if dist == 0:
+            return
+        nx, ny = dx / dist, dy / dist
+        dot = ball.vx * nx + ball.vy * ny
+        ball.vx -= 2 * dot * nx
+        ball.vy -= 2 * dot * ny
+        # Add random angle change (up to ±18 degrees)
+        angle = math.atan2(ball.vy, ball.vx)
+        angle += math.radians(random.uniform(-18, 18))
+        speed = math.hypot(ball.vx, ball.vy)
+        # Increase speed by 4%
+        speed *= 1.04
+        ball.vx = speed * math.cos(angle)
+        ball.vy = speed * math.sin(angle)
+        # nudge away from paddle
+        ball.x = CX + nx * (PADDLE_ORBIT - BALL_RADIUS - PADDLE_THICK // 2 - 3)
+        ball.y = CY + ny * (PADDLE_ORBIT - BALL_RADIUS - PADDLE_THICK // 2 - 3)
+        self.flash = HIT_FLASH
+ 
+    def draw(self, surf):
+        glow = self.flash > 0
+        col = (255, 255, 255)
+        draw_arc_paddle(surf, col, CX, CY, PADDLE_ORBIT,
+                        self.angle, PADDLE_ARC_DEG, PADDLE_THICK, glow=glow)
+ 
+ 
+# ── Main ───────────────────────────────────────────────────────────────────────
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Circular Pong")
+    clock  = pygame.time.Clock()
+ 
+    font_large = pygame.font.SysFont("Consolas", 72, bold=True)
+    font_med   = pygame.font.SysFont("Consolas", 32)
+    font_small = pygame.font.SysFont("Consolas", 22)
+ 
+    # Player 1: bottom  (270°), arrow keys
+    # Player 2: top     (90°),  A/D keys
+    p1 = Paddle(270, P1_COL, pygame.K_LEFT,  pygame.K_RIGHT)
+    p2 = Paddle(90,  P2_COL, pygame.K_a,     pygame.K_d)
+    ball = Ball()
+ 
+    score = [0, 0]
+    WIN_SCORE = 7
+ 
+    state = "menu"   # "menu" | "playing" | "point" | "win"
+    point_timer = 0
+    winner = None
+    last_scorer = None
+    mode = 0  # 0 = 2 Players, 1 = Vs AI
+    mode_names = ["2 Players", "Vs AI"]
+    player_hits = 0
+ 
+    # pre-render static arena surface
+    arena_surf = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    # outer glow rings
+    for r in range(5):
+        pygame.draw.circle(arena_surf, (255, 255, 255, 30),
+                           CENTER, ARENA_RADIUS + r * 3, 1)
+    # arena wall
+    pygame.draw.circle(arena_surf, ARENA_COL, CENTER, ARENA_RADIUS, 2)
+    # centre dot
+    pygame.draw.circle(arena_surf, ARENA_COL, CENTER, 6)
+    # dashed dividing line (horizontal)
+    for x in range(CX - ARENA_RADIUS + 10, CX + ARENA_RADIUS, 18):
+        pygame.draw.line(arena_surf, (255, 255, 255), (x, CY), (x + 10, CY), 1)
+ 
+    running = True
+    while running:
+        dt = clock.tick(FPS)
+
+        # ── Events ──
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if state == "menu":
+                    if event.key == pygame.K_LEFT:
+                        mode = (mode - 1) % 2
+                    if event.key == pygame.K_RIGHT:
+                        mode = (mode + 1) % 2
+                    if event.key == pygame.K_SPACE:
+                        state = "playing"
+                        score = [0, 0]
+                        winner = None
+                        ball.reset()
+                elif state == "playing":
+                    if event.key == pygame.K_ESCAPE:
+                        state = "menu"
+                elif state in ("point", "win"):
+                    if event.key == pygame.K_SPACE:
+                        if state == "win":
+                            score = [0, 0]
+                            winner = None
+                        ball.reset()
+                        state = "playing"
+
+        keys = pygame.key.get_pressed()
+
+        # ── Update ──
+        if state == "playing":
+            # Restrict p1 to bottom half, p2 to top half
+            p1.update(keys, restrict_half='bottom')
+            if mode == 0:
+                # 2 Players
+                p2.update(keys, restrict_half='top')
+            else:
+                # Vs AI: Improved AI controls p2
+                ball_ang = ball.angle_from_center() % 360
+                pad_ang = p2.angle % 360
+                diff = (ball_ang - pad_ang + 540) % 360 - 180
+                
+                ai_speed = p2.speed * 2.5  
+                if abs(diff) > 0.5:
+                    if diff > 0:
+                        p2.angle += ai_speed
+                    else:
+                        p2.angle -= ai_speed
+                    p2.angle %= 360
+                # Restrict to top half
+                if p2.angle > 180 and p2.angle < 360:
+                    p2.angle = 180
+                if p2.flash > 0:
+                    p2.flash -= 1
+            ball.update()
+
+            dist = ball.dist_from_center()
+
+            # Paddle hit detection
+            for i, pad in enumerate([p1, p2]):
+                if pad.hit_test(ball):
+                    pad.bounce_ball(ball)
+                    # Count player hits in AI mode (player is p1)
+                    if mode == 1 and i == 0:
+                        player_hits += 1
+
+            # Wall bounce or score
+            if dist >= ARENA_RADIUS - BALL_RADIUS:
+                if mode == 1 and dist > ARENA_RADIUS + 50:
+                    # In AI mode, if ball goes far outside arena, reset it to prevent getting stuck
+                    ball.reset()
+                    continue
+          
+               
+                ball_ang = ball.angle_from_center() % 360
+ 
+                # Determine if ball is in p1 or p2 scoring zone
+                # p1 guards bottom (270°), p2 guards top (90°)
+                # Score zone: opposite side of each paddle
+                # If ball exits near top (around 90°) → p1 scores
+                # If ball exits near bottom (around 270°) → p2 scores
+                near_top    = (ball_ang > 45  and ball_ang < 135)
+                near_bottom = (ball_ang > 225 and ball_ang < 315)
+
+                if near_top:
+                    score[1] += 1
+                    last_scorer = 0
+                    state = "point"
+                    point_timer = FPS * 2
+                elif near_bottom:
+                    score[0] += 1
+                    last_scorer = 1
+                    state = "point"
+                    point_timer = FPS * 2
+                else:
+                    ball.reflect_off_wall()
+
+            # Check win
+            if max(score) >= WIN_SCORE:
+                state = "win"
+                winner = 0 if score[0] >= WIN_SCORE else 1
+
+        elif state == "point":
+            point_timer -= 1
+            if point_timer <= 0:
+                ball.reset()
+                state = "playing"
+            # Reset player_hits for next round in AI mode
+            if mode == 1:
+                player_hits = 0
+
+        # ── Draw ──
+        screen.fill(BG_DARK)
+        screen.blit(arena_surf, (0, 0))
+
+        if state == "menu":
+            # Menu screen
+            title = font_large.render("CIRCULAR PONG", True, (255, 255, 255))
+            instr1 = font_med.render("P1: ← →   P2: A D", True, (255, 255, 255))
+            instr2 = font_small.render("First to 7 wins!", True, (255, 255, 255))
+            instr3 = font_small.render("Press SPACE to start", True, (255, 255, 255))
+            instr4 = font_small.render("Press ESC during game to return to menu", True, (255, 255, 255))
+            instr5 = font_small.render("Use ← → to switch modes", True, (255, 255, 255))
+            mode_strs = []
+            for i, name in enumerate(mode_names):
+                sel = "<" if i == mode else " "
+                sel2 = ">" if i == mode else " "
+                mode_strs.append(f"{sel} {name} {sel2}")
+            mode1 = font_med.render(mode_strs[0], True, (255,255,255) if mode==0 else (180,180,180))
+            mode2 = font_med.render(mode_strs[1], True, (255,255,255) if mode==1 else (180,180,180))
+            screen.blit(title, (CX - title.get_width()//2, CY - 160))
+            screen.blit(instr1, (CX - instr1.get_width()//2, CY - 70))
+            screen.blit(instr2, (CX - instr2.get_width()//2, CY - 30))
+            screen.blit(mode1, (CX - mode1.get_width()//2, CY + 20))
+            screen.blit(mode2, (CX - mode2.get_width()//2, CY + 60))
+            screen.blit(instr3, (CX - instr3.get_width()//2, CY + 110))
+            screen.blit(instr5, (CX - instr5.get_width()//2, CY + 140))
+            screen.blit(instr4, (CX - instr4.get_width()//2, CY + 170))
+        else:
+            if mode == 1:
+                
+
+                hits_text = font_small.render(f"Your Hits: {player_hits}", True, (255, 255, 255))
+                screen.blit(hits_text, (CX - hits_text.get_width()//2, CY + 180))
+            else:
+               
+                s1 = font_large.render(str(score[0]), True, (0, 0, 0), (255, 255, 255))
+                s2 = font_large.render(str(score[1]), True, (0, 0, 0), (255, 255, 255))
+                screen.blit(s1, (CX - 80, CY + 30))
+                screen.blit(s2, (CX + 40, CY - 90))
+
+            # Labels
+            l1 = font_small.render("P1 ← →", True, (255, 255, 255))
+            l2 = font_small.render("P2  A D", True, (255, 255, 255))
+            screen.blit(l1, (20, HEIGHT - 30))
+            screen.blit(l2, (WIDTH - 110, 10))
+
+            ball.draw(screen)
+            p1.draw(screen)
+            p2.draw(screen)
+
+            # Overlay messages
+            if state == "point":
+                scorer = "P1" if last_scorer == 0 else "P2"
+                col    = P1_COL if last_scorer == 0 else P2_COL
+                msg  = font_med.render(f"{scorer} scores!", True, (255, 255, 255))
+                sub  = font_small.render("Next ball launching…", True, (255, 255, 255))
+                screen.blit(msg, (CX - msg.get_width()//2, CY - 20))
+                screen.blit(sub, (CX - sub.get_width()//2, CY + 30))
+
+            elif state == "win":
+                scorer = "P1" if winner == 0 else "P2"
+                col    = P1_COL if winner == 0 else P2_COL
+                msg  = font_large.render(f"{scorer} WINS!", True, (255, 255, 255))
+                sub  = font_small.render("Press SPACE to play again", True, (255, 255, 255))
+                screen.blit(msg, (CX - msg.get_width()//2, CY - 50))
+                screen.blit(sub, (CX - sub.get_width()//2, CY + 40))
+
+        pygame.display.flip()
+
+    pygame.quit()
+    sys.exit()
+ 
+ 
+if __name__ == "__main__":
+    main()
