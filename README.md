@@ -10,9 +10,8 @@ Bellow I have presented images of the game itself, and the code used to make the
  - Python 
 
 <h2> Game Itself </h2>
-
-
-https://alexrswift-alt.github.io/Complete Game Code/
+Here you can play the game straight away through itch.io
+https://alexrswift.itch.io/ponggame
 
 The full game script is linked in this repository. 
 <h3> To Install and Run</h3>
