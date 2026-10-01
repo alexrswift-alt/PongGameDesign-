@@ -11,7 +11,8 @@ Bellow I have presented images of the game itself, and the code used to make the
 
 <h2> Game Itself </h2>
 
-[![▶ PLAY THE GAME](https://img.shields.io/badge/▶%20PLAY%20THE%20GAME-Click%20Here-brightgreen?style=for-the-badge)](https://alexrswift-alt.github.io/PongGameDesign/)
+
+https://alexrswift-alt.github.io/Complete Game Code/
 
 The full game script is linked in this repository. 
 <h3> To Install and Run</h3>
