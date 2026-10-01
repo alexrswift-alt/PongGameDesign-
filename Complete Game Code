@@ -1,6 +1,6 @@
-import pygame, math, random, sys
+import pygame, math, random, sys, asyncio
  
-#  Constants
+# ── Constants ──────────────────────────────────────────────────────────────────
 WIDTH, HEIGHT = 800, 800
 FPS = 60
 CENTER = (WIDTH // 2, HEIGHT // 2)
@@ -15,7 +15,7 @@ BALL_RADIUS    = 10
 BALL_SPEED     = 3.2
  
 
-# colors
+# Black and white colors
 BG_DARK      = (0, 0, 0)
 ARENA_COL    = (0, 128, 128)
 BALL_COL     = (0, 128, 128)
@@ -26,7 +26,7 @@ GLOW_COL     = (0, 128, 128, 60)
 HIT_FLASH    = 8            # frames to flash paddle on hit
  
  
-# Helper
+# ── Helper ─────────────────────────────────────────────────────────────────────
 def angle_to_vec(deg):
     r = math.radians(deg)
     return math.cos(r), math.sin(r)
@@ -64,7 +64,7 @@ def point_on_arc(cx, cy, radius, mid_angle_deg, arc_deg):
     return pts
  
  
-#  Game State
+# ── Game State ─────────────────────────────────────────────────────────────────
 class Ball:
     def __init__(self):
         self.reset()
@@ -97,7 +97,7 @@ class Ball:
         dist = math.hypot(dx, dy)
         if dist == 0:
             return
-        nx, ny = dx / dist, dy / dist          
+        nx, ny = dx / dist, dy / dist          # outward normal
         dot = self.vx * nx + self.vy * ny
         self.vx -= 2 * dot * nx
         self.vy -= 2 * dot * ny
@@ -136,18 +136,12 @@ class Paddle:
             self.angle -= self.speed
         if keys[self.key_r]:
             self.angle += self.speed
-        self.angle %= 360
-        # Restrict paddle to its half if specified
+
         if restrict_half == 'bottom':
-            # 180° to 360° (or -180° to 0°)
-            if self.angle < 180:
-                self.angle = 180
-            if self.angle > 360:
-                self.angle = 360
+            self.angle = max(0, min(180, self.angle))
         elif restrict_half == 'top':
-            # 0° to 180°
-            if self.angle > 180 and self.angle < 360:
-                self.angle = 180
+            self.angle = max(180, min(360, self.angle))
+
         if self.flash > 0:
             self.flash -= 1
  
@@ -194,8 +188,8 @@ class Paddle:
                         self.angle, PADDLE_ARC_DEG, PADDLE_THICK, glow=glow)
  
  
-#  Main 
-def main():
+# ── Main ───────────────────────────────────────────────────────────────────────
+async def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Circular Pong")
@@ -207,8 +201,8 @@ def main():
  
     # Player 1: bottom  (270°), arrow keys
     # Player 2: top     (90°),  A/D keys
-    p1 = Paddle(270, P1_COL, pygame.K_LEFT,  pygame.K_RIGHT)
-    p2 = Paddle(90,  P2_COL, pygame.K_a,     pygame.K_d)
+    p1 = Paddle(90, P1_COL, pygame.K_RIGHT,  pygame.K_LEFT)
+    p2 = Paddle(270,  P2_COL, pygame.K_a,     pygame.K_d)
     ball = Ball()
  
     score = [0, 0]
@@ -239,8 +233,9 @@ def main():
     running = True
     while running:
         dt = clock.tick(FPS)
+        await asyncio.sleep(0)
 
-        #  Events
+        # ── Events ──
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -268,7 +263,7 @@ def main():
 
         keys = pygame.key.get_pressed()
 
-       # additions 
+        # ── Update ──
         if state == "playing":
             # Restrict p1 to bottom half, p2 to top half
             p1.update(keys, restrict_half='bottom')
@@ -315,28 +310,24 @@ def main():
                
                 ball_ang = ball.angle_from_center() % 360
  
-                # Determine if ball is in p1 or p2 scoring zone
-                # p1 guards bottom (270°), p2 guards top (90°)
-                # Score zone: opposite side of each paddle
-                # If ball exits near top (around 90°) → p1 scores
-                # If ball exits near bottom (around 270°) → p2 scores
-                near_top    = (ball_ang > 45  and ball_ang < 135)
-                near_bottom = (ball_ang > 225 and ball_ang < 315)
-
-                if near_top:
+               
+                if ball.y < CY:
+                    # Ball has gone out through the top
                     score[1] += 1
-                    last_scorer = 0
+                    last_scorer = 1
                     state = "point"
                     point_timer = FPS * 2
-                elif near_bottom:
+                elif ball.y > CY:
+                    # Ball has gone out through the bottom
                     score[0] += 1
-                    last_scorer = 1
+                    last_scorer = 0
                     state = "point"
                     point_timer = FPS * 2
                 else:
                     ball.reflect_off_wall()
 
-            # Check win
+            
+        # Check win
             if max(score) >= WIN_SCORE:
                 state = "win"
                 winner = 0 if score[0] >= WIN_SCORE else 1
@@ -350,18 +341,18 @@ def main():
             if mode == 1:
                 player_hits = 0
 
-        # Draw
+        # ── Draw ──
         screen.fill(BG_DARK)
         screen.blit(arena_surf, (0, 0))
 
         if state == "menu":
             # Menu screen
             title = font_large.render("CIRCULAR PONG", True, (255, 255, 255))
-            instr1 = font_med.render("P1: ← →   P2: A D", True, (255, 255, 255))
+            instr1 = font_med.render("P1: LEFT RIGHT   P2: A D", True, (255, 255, 255))
             instr2 = font_small.render("First to 7 wins!", True, (255, 255, 255))
             instr3 = font_small.render("Press SPACE to start", True, (255, 255, 255))
             instr4 = font_small.render("Press ESC during game to return to menu", True, (255, 255, 255))
-            instr5 = font_small.render("Use ← → to switch modes", True, (255, 255, 255))
+            instr5 = font_small.render("Use LEFT RIGHT to switch modes", True, (255, 255, 255))
             mode_strs = []
             for i, name in enumerate(mode_names):
                 sel = "<" if i == mode else " "
@@ -391,7 +382,7 @@ def main():
                 screen.blit(s2, (CX + 40, CY - 90))
 
             # Labels
-            l1 = font_small.render("P1 ← →", True, (255, 255, 255))
+            l1 = font_small.render("P1 LEFT RIGHT", True, (255, 255, 255))
             l2 = font_small.render("P2  A D", True, (255, 255, 255))
             screen.blit(l1, (20, HEIGHT - 30))
             screen.blit(l2, (WIDTH - 110, 10))
@@ -424,4 +415,4 @@ def main():
  
  
 if __name__ == "__main__":
-    main()
+   asyncio.run(main()) 
