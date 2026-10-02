@@ -14,7 +14,7 @@ Here you can play the game straight away through itch.io
 
 <p align="center">
   <a href=https://alexrswift.itch.io/ponggame>
-    <img src="https://shields.io" alt="Play Button" height="40">
+    <img src="https://img.shields.io/badge/▶_PLAY-Circular_Pong-brightgreen?style=for-the-badge" alt="Play Button" height="40">
   </a>
 </p>
   
