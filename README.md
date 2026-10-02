@@ -12,7 +12,7 @@ Bellow I have presented images of the game itself, and the code used to make the
 <h2> Game Itself </h2>
 Here you can play the game straight away through itch.io
 
-https://alexrswift.itch.io/ponggame
+[![Play Demo](https://shields.io)](https://alexrswift.itch.io/ponggame)
 
 The full game script is linked in this repository. 
 
