@@ -10,11 +10,7 @@ Bellow I have presented images of the game itself, and the code used to make the
  - Python 
 
 <h2> Game Itself </h2>
-Here you can play the game straight away through itch.io
-
-
-
-
+                                                    Here you can play the game straight away through itch.io
 
 <p align="center">
   <a href=https://alexrswift.itch.io/ponggame>
