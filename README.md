@@ -20,7 +20,7 @@ Here you can play the game straight away through itch.io
 </p>
   
 
-The full game script is linked in this repository. 
+<h2> Game Code </h2>
 
 <h3> Reflection </h3>
 
