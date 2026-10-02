@@ -13,8 +13,11 @@ Bellow I have presented images of the game itself, and the code used to make the
 Here you can play the game straight away through itch.io
 
 <p align="center">
-   [![Play Circular Pong](https://img.shields.io/badge/▶_PLAY-Circular_Pong-brightgreen?style=for-the-badge)](https://alexrswift.itch.io/ponggame)
-
+  <a href=https://alexrswift.itch.io/ponggame>
+    <img src="https://shields.io" alt="Play Button" height="40">
+  </a>
+</p>
+  
 
 The full game script is linked in this repository. 
 
