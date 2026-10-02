@@ -14,9 +14,9 @@ Bellow I have presented images of the game itself, and the code used to make the
 Here you can play the game straight away through itch.io
 
 <p align="center">
-  <a href=https://alexrswift.itch.io/ponggame>
-    <img src="https://img.shields.io/badge/▶_PLAY-Circular_Pong-brightgreen?style=for-the-badge" alt="Play Button" height="40">
-  </a>
+<a href=https://alexrswift.itch.io/ponggame>
+<img src="https://img.shields.io/badge/▶_PLAY-Circular_Pong-brightgreen?style=for-the-badge" alt="Play Button" height="40">
+</a>
 </p>
   
 
