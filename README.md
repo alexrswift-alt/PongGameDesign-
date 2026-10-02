@@ -12,6 +12,7 @@ Bellow I have presented images of the game itself, and the code used to make the
 <h2> Game Itself </h2>
 Here you can play the game straight away through itch.io
 
+
 [![Play Circular Pong](https://img.shields.io/badge/▶_PLAY-Circular_Pong-brightgreen?style=for-the-badge)](https://alexrswift.itch.io/ponggame)
 
 
