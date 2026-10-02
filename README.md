@@ -12,11 +12,8 @@ Bellow I have presented images of the game itself, and the code used to make the
 <h2> Game Itself </h2>
 Here you can play the game straight away through itch.io
 
-<a href="YOUR_DEMO_URL_HERE">
-  <img src="https://shields.io" alt="Play Me">
-</a>
 
-[![Play Game](https://shields.io)](https://alexrswift.itch.io/ponggame)
+[Play Game](https://shields.io)](https://alexrswift.itch.io/ponggame)
 
 The full game script is linked in this repository. 
 
